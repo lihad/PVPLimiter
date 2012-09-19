@@ -1,6 +1,7 @@
 package Lihad.PVPLimiter;
 
 import java.util.logging.Logger;
+import java.util.Date;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -23,8 +24,11 @@ public class PVPLimiter extends JavaPlugin implements Listener {
     protected static String header = "[" + PLUGIN_NAME + "] ";
     public static PermissionHandler handler;
     private static Logger log = Logger.getLogger("Minecraft");
+
+    static final long pvpToggleCooldown = 48 * 3600 * 1000; // 48 hours
     
     java.util.Map<String, Long> pvpDisabledPlayers = new java.util.HashMap<String, Long>();
+    java.util.Map<String, Long> pvpEnabledPlayers = new java.util.HashMap<String, Long>();
 
     @Override
     public void onEnable() {
@@ -32,7 +36,20 @@ public class PVPLimiter extends JavaPlugin implements Listener {
         getCommand("pvpenable").setExecutor(this);
         getCommand("pvpdisable").setExecutor(this);
         load();
+
+        getServer().getScheduler().scheduleAsyncRepeatingTask(this, new Runnable() {
+            public void run() {
+                save(); // every 5 mins
+            }
+        },1200L, 6000L);
+
     }
+    
+    @Override
+    public void onDisable() {
+        save();
+    }
+    
     @EventHandler
     public void onEntityDamageByEntityEvent(EntityDamageByEntityEvent event){
 
@@ -71,14 +88,24 @@ public class PVPLimiter extends JavaPlugin implements Listener {
     void load() {
         java.io.File configFile = new java.io.File(getDataFolder(), "players.yml");
         YamlConfiguration config = loadInfoFile(configFile);
+
+        pvpDisabledPlayers.clear();
         ConfigurationSection section = config.getConfigurationSection("pvpdisable");
         if (config != null && section != null) {
-
-            pvpDisabledPlayers.clear();
             java.util.Set<String> keys = section.getKeys(false);
             for (String key : keys) {
                 long timestamp = section.getLong(key);
                 pvpDisabledPlayers.put(key, timestamp);
+            }
+        }
+
+        pvpEnabledPlayers.clear();
+        section = config.getConfigurationSection("pvpenable");
+        if (config != null && section != null) {
+            java.util.Set<String> keys = section.getKeys(false);
+            for (String key : keys) {
+                long timestamp = section.getLong(key);
+                pvpEnabledPlayers.put(key, timestamp);
             }
         }
     }
@@ -87,6 +114,10 @@ public class PVPLimiter extends JavaPlugin implements Listener {
         YamlConfiguration config = new YamlConfiguration();
         ConfigurationSection section = config.createSection("pvpdisable");
         for (java.util.Map.Entry<String, Long> entry : pvpDisabledPlayers.entrySet()) {
+            section.set(entry.getKey(), entry.getValue());
+        }        
+        section = config.createSection("pvpenable");
+        for (java.util.Map.Entry<String, Long> entry : pvpEnabledPlayers.entrySet()) {
             section.set(entry.getKey(), entry.getValue());
         }        
         java.io.File configFile = new java.io.File(getDataFolder(), "players.yml");
@@ -146,19 +177,58 @@ public class PVPLimiter extends JavaPlugin implements Listener {
         if(cmd.getName().equalsIgnoreCase("pvpdisable")) {
 
             if (arg.length == 0) {
-                sender.sendMessage("/war join  -- Join current war");
-                sender.sendMessage("/war stats -- See current war scoreboard");
-                sender.sendMessage("/war teams -- See the current teams");
-                if (sender.isOp()) {
-                    sender.sendMessage("Op only:");
-                    sender.sendMessage("/war start [duration-in-mins]");
-                    sender.sendMessage("/war createzone <name>");
-                    sender.sendMessage("/war removezone <name>");
-                    sender.sendMessage("/war reload");
-                }
+                sender.sendMessage("Disable PVP has a 48 hour cooldown.");
+                sender.sendMessage("Type /pvpdisable Confirm to confirm");
                 return true;
             }
+            if (arg[0].equalsIgnoreCase("confirm") && (sender instanceof Player)) {
+                String playerName = ((Player)sender).getName();
+                if (pvpEnabledPlayers.containsKey(playerName)) {
+                     Date cooldownTime = new Date((long)pvpEnabledPlayers.get(playerName) + pvpToggleCooldown);
+                     if ((new Date()).before(cooldownTime)) {
+                        sender.sendMessage("You can't disable PvP right now.");
+                        return true;
+                    }
+                }
+                sender.sendMessage("PvP is now disabled for you in survival world.");
+                pvpDisabledPlayers.put(playerName, (new Date()).getTime());
+                pvpEnabledPlayers.remove(playerName);
+                return true;
+            }
+            
+            else if (sender.isOp() && arg[0].equalsIgnoreCase("reload")) {
+                load();
+                sender.sendMessage("players.yml reloaded");
+                return true;
+            }
+        }
+        else if(cmd.getName().equalsIgnoreCase("pvpenable")) {
 
+            if (arg.length == 0) {
+                sender.sendMessage("Enable PVP has a 48 hour cooldown.");
+                sender.sendMessage("Type /pvpenable Confirm to confirm");
+                return true;
+            }
+            if (arg[0].equalsIgnoreCase("confirm") && (sender instanceof Player)) {
+                String playerName = ((Player)sender).getName();
+                if (pvpDisabledPlayers.containsKey(playerName)) {
+                     Date cooldownTime = new Date((long)pvpDisabledPlayers.get(playerName) + pvpToggleCooldown);
+                     if ((new Date()).before(cooldownTime)) {
+                        sender.sendMessage("You can't enable PvP right now.");
+                        return true;
+                    }
+                }
+                sender.sendMessage("PvP is now enabled for you in survival world.");
+                pvpEnabledPlayers.put(playerName, (new Date()).getTime());
+                pvpDisabledPlayers.remove(playerName);
+                return true;
+            }
+            else if (sender.isOp() && arg[0].equalsIgnoreCase("reload")) {
+                load();
+                sender.sendMessage("players.yml reloaded");
+                return true;
+            }
+        }
         
         return false;
     }

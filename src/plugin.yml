@@ -1,3 +1,9 @@
 name: BeyondPvpLimiter
 main: Lihad.PVPLimiter.PVPLimiter
-version: 0.1.0
+version: 0.2.0
+commands:
+  pvpenable:
+    description: Enable PvP
+  pvpdisable:
+    description: Disable PvP
+

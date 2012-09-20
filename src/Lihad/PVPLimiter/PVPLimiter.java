@@ -68,7 +68,7 @@ public class PVPLimiter extends JavaPlugin implements Listener {
                         return;
                     }
 
-                    if (pvpDisabledPlayers.containsKey(hurt.getName()) || pvpDisabledPlayers.containsKey(attacker.getName())) {
+                    if (!pvpEnabledPlayers.containsKey(hurt.getName()) && !pvpEnabledPlayers.containsKey(attacker.getName())) {
                         event.setCancelled(true);
                     }
 

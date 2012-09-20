@@ -78,7 +78,7 @@ public class PVPLimiter extends JavaPlugin implements Listener {
                     }
                     
                     if (handler.has(hurt, "beyondpvp.thorns")) {
-                        attacker.damage(event.getDamage() * 2, hurt);
+                        attacker.damage(event.getDamage() * 2);
                     }
                 }
             }
